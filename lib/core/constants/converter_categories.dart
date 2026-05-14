@@ -22,6 +22,18 @@ extension ConverterCategoryX on ConverterCategory {
         ConverterCategory.dataStorage => 'Data Storage',
       };
 
+  String localizedLabel(String langCode) => langCode == 'vi'
+      ? switch (this) {
+          ConverterCategory.length => 'Chiều dài',
+          ConverterCategory.weight => 'Khối lượng',
+          ConverterCategory.temperature => 'Nhiệt độ',
+          ConverterCategory.area => 'Diện tích',
+          ConverterCategory.speed => 'Tốc độ',
+          ConverterCategory.currency => 'Tiền tệ',
+          ConverterCategory.dataStorage => 'Lưu trữ',
+        }
+      : label;
+
   IconData get icon => switch (this) {
         ConverterCategory.length => Icons.straighten_rounded,
         ConverterCategory.weight => Icons.monitor_weight_outlined,

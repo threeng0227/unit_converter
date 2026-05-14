@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:unit_converter_pro/core/constants/converter_categories.dart';
+import 'package:unit_converter_pro/core/l10n/app_strings.dart';
+import 'package:unit_converter_pro/core/l10n/locale_provider.dart';
 import 'package:unit_converter_pro/core/theme/app_theme.dart';
 import 'package:unit_converter_pro/core/utils/number_formatter.dart';
 import 'package:unit_converter_pro/features/history/history_provider.dart';
@@ -11,9 +13,11 @@ class HistoryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = stringsOf(ref);
     final history = ref.watch(historyProvider);
     final notifier = ref.read(historyProvider.notifier);
-    final dateFmt = DateFormat('d MMM · HH:mm');
+    final lang = ref.watch(localeProvider).languageCode;
+    final dateFmt = DateFormat('d MMM · HH:mm', lang);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -34,15 +38,15 @@ class HistoryScreen extends ConsumerWidget {
           ),
         ),
         leadingWidth: 52,
-        title: const Text('History',
-            style: TextStyle(
+        title: Text(s.history,
+            style: const TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.w700)),
         actions: [
           if (history.isNotEmpty)
             GestureDetector(
-              onTap: () => _confirmClear(context, notifier),
+              onTap: () => _confirmClear(context, notifier, s),
               child: Container(
                 margin: const EdgeInsets.only(right: 14),
                 padding:
@@ -52,8 +56,8 @@ class HistoryScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.red.withValues(alpha: 0.25)),
                 ),
-                child: const Text('Clear',
-                    style: TextStyle(
+                child: Text(s.clear,
+                    style: const TextStyle(
                         color: Colors.redAccent,
                         fontSize: 13,
                         fontWeight: FontWeight.w600)),
@@ -62,7 +66,7 @@ class HistoryScreen extends ConsumerWidget {
         ],
       ),
       body: history.isEmpty
-          ? _empty()
+          ? _empty(s)
           : ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
               itemCount: history.length,
@@ -101,7 +105,7 @@ class HistoryScreen extends ConsumerWidget {
     );
   }
 
-  Widget _empty() {
+  Widget _empty(S s) {
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -118,35 +122,36 @@ class HistoryScreen extends ConsumerWidget {
                 size: 32, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 16),
-          const Text('No history yet',
-              style: TextStyle(
+          Text(s.noHistoryYet,
+              style: const TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 16,
                   fontWeight: FontWeight.w600)),
           const SizedBox(height: 4),
-          const Text('Your conversions will appear here',
+          Text(s.noHistorySubtitle,
               style:
-                  TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                  const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
         ],
       ),
     );
   }
 
-  void _confirmClear(BuildContext context, HistoryNotifier notifier) {
+  void _confirmClear(BuildContext context, HistoryNotifier notifier, S s) {
     showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Clear history?',
-            style: TextStyle(color: AppColors.textPrimary, fontSize: 17)),
-        content: const Text('All conversion history will be deleted.',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+        title: Text(s.clearHistoryTitle,
+            style: const TextStyle(color: AppColors.textPrimary, fontSize: 17)),
+        content: Text(s.clearHistoryContent,
+            style:
+                const TextStyle(color: AppColors.textSecondary, fontSize: 14)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel',
-                style: TextStyle(color: AppColors.textSecondary)),
+            child: Text(s.cancel,
+                style: const TextStyle(color: AppColors.textSecondary)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -159,7 +164,7 @@ class HistoryScreen extends ConsumerWidget {
               Navigator.pop(ctx);
               notifier.clear();
             },
-            child: const Text('Clear'),
+            child: Text(s.clear),
           ),
         ],
       ),
@@ -197,7 +202,6 @@ class _HistoryCard extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         child: Row(
           children: [
-            // Category icon
             Container(
               width: 40,
               height: 40,
@@ -208,7 +212,6 @@ class _HistoryCard extends StatelessWidget {
               child: Icon(category.icon, color: Colors.white, size: 18),
             ),
             const SizedBox(width: 12),
-            // Values
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -232,7 +235,6 @@ class _HistoryCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            // Time
             Text(time,
                 style: const TextStyle(
                     color: AppColors.textSecondary, fontSize: 11)),

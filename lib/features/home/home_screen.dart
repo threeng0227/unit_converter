@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:unit_converter_pro/core/constants/converter_categories.dart';
+import 'package:unit_converter_pro/core/l10n/locale_provider.dart';
 import 'package:unit_converter_pro/core/theme/app_theme.dart';
 import 'package:unit_converter_pro/features/history/history_provider.dart';
 import 'package:unit_converter_pro/shared/widgets/banner_ad_widget.dart';
@@ -15,9 +16,11 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = stringsOf(ref);
     final query = ref.watch(_searchProvider);
+    final lang = ref.watch(localeProvider).languageCode;
     final categories = ConverterCategory.values
-        .where((c) => c.label.toLowerCase().contains(query.toLowerCase()))
+        .where((c) => c.localizedLabel(lang).toLowerCase().contains(query.toLowerCase()))
         .toList();
 
     return Scaffold(
@@ -32,6 +35,7 @@ class HomeScreen extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: _SearchBar(
+                hint: s.searchConverter,
                 onChanged: (q) =>
                     ref.read(_searchProvider.notifier).state = q,
               ),
@@ -39,12 +43,12 @@ class HomeScreen extends ConsumerWidget {
             const SizedBox(height: 20),
             Expanded(
               child: categories.isEmpty
-                  ? const Center(
-                      child: Text('No results',
-                          style:
-                              TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+                  ? Center(
+                      child: Text(s.noResults,
+                          style: const TextStyle(
+                              color: AppColors.textSecondary, fontSize: 14)),
                     )
-                  : _CategoryGrid(categories: categories),
+                  : _CategoryGrid(categories: categories, lang: lang),
             ),
             const BannerAdWidget(),
           ],
@@ -58,7 +62,9 @@ class HomeScreen extends ConsumerWidget {
 class _Header extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = stringsOf(ref);
     final count = ref.watch(historyProvider).length;
+    final locale = ref.watch(localeProvider);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -71,7 +77,7 @@ class _Header extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Unit Converter',
+                  s.appTitle,
                   style: const TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 26,
@@ -82,7 +88,7 @@ class _Header extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${ConverterCategory.values.length} converters • Works offline',
+                  '${ConverterCategory.values.length} ${s.homeSubtitle}',
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 13,
@@ -92,7 +98,29 @@ class _Header extends ConsumerWidget {
               ],
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
+          // ── Language toggle ────────────────────────────────────────────
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              ref.read(localeProvider.notifier).toggle();
+            },
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.cardBorder),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                locale.languageCode == 'en' ? '🇬🇧' : '🇻🇳',
+                style: const TextStyle(fontSize: 22),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           _HistoryButton(count: count),
         ],
       ),
@@ -160,7 +188,8 @@ class _HistoryButton extends StatelessWidget {
 // ── Search bar ────────────────────────────────────────────────────────────────
 class _SearchBar extends StatefulWidget {
   final ValueChanged<String> onChanged;
-  const _SearchBar({required this.onChanged});
+  final String hint;
+  const _SearchBar({required this.onChanged, required this.hint});
 
   @override
   State<_SearchBar> createState() => _SearchBarState();
@@ -178,73 +207,74 @@ class _SearchBarState extends State<_SearchBar> {
   @override
   Widget build(BuildContext context) {
     return TextField(
-        controller: _ctrl,
-        onChanged: (v) {
-          widget.onChanged(v);
-          setState(() {});
-        },
-        style: const TextStyle(
-          color: AppColors.textPrimary,
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
+      controller: _ctrl,
+      onChanged: (v) {
+        widget.onChanged(v);
+        setState(() {});
+      },
+      style: const TextStyle(
+        color: AppColors.textPrimary,
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+      ),
+      decoration: InputDecoration(
+        hintText: widget.hint,
+        hintStyle: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 14,
+            fontWeight: FontWeight.w400),
+        prefixIcon: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 14),
+          child: Icon(Icons.search_rounded,
+              color: AppColors.textSecondary, size: 20),
         ),
-        decoration: InputDecoration(
-          hintText: 'Search converter...',
-          hintStyle: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 14,
-              fontWeight: FontWeight.w400),
-          prefixIcon: const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 14),
-            child: Icon(Icons.search_rounded,
-                color: AppColors.textSecondary, size: 20),
-          ),
-          prefixIconConstraints:
-              const BoxConstraints(minWidth: 48, minHeight: 48),
-          suffixIcon: _ctrl.text.isNotEmpty
-              ? GestureDetector(
-                  onTap: () {
-                    _ctrl.clear();
-                    widget.onChanged('');
-                    setState(() {});
-                  },
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 14),
-                    child: Icon(Icons.close_rounded,
-                        color: AppColors.textSecondary, size: 16),
-                  ),
-                )
-              : null,
-          suffixIconConstraints:
-              const BoxConstraints(minWidth: 44, minHeight: 44),
-          filled: true,
-          fillColor: AppColors.card,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: AppColors.cardBorder),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: AppColors.cardBorder),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide:
-                const BorderSide(color: AppColors.primary, width: 1.5),
-          ),
-          contentPadding: EdgeInsets.zero,
+        prefixIconConstraints:
+            const BoxConstraints(minWidth: 48, minHeight: 48),
+        suffixIcon: _ctrl.text.isNotEmpty
+            ? GestureDetector(
+                onTap: () {
+                  _ctrl.clear();
+                  widget.onChanged('');
+                  setState(() {});
+                },
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 14),
+                  child: Icon(Icons.close_rounded,
+                      color: AppColors.textSecondary, size: 16),
+                ),
+              )
+            : null,
+        suffixIconConstraints:
+            const BoxConstraints(minWidth: 44, minHeight: 44),
+        filled: true,
+        fillColor: AppColors.card,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.cardBorder),
         ),
-      );
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.cardBorder),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        ),
+        contentPadding: EdgeInsets.zero,
+      ),
+    );
   }
 }
 
 // ── Grid ──────────────────────────────────────────────────────────────────────
-class _CategoryGrid extends StatelessWidget {
+class _CategoryGrid extends ConsumerWidget {
   final List<ConverterCategory> categories;
-  const _CategoryGrid({required this.categories});
+  final String lang;
+  const _CategoryGrid({required this.categories, required this.lang});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = stringsOf(ref);
     return GridView.builder(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -257,6 +287,8 @@ class _CategoryGrid extends StatelessWidget {
       itemBuilder: (ctx, i) => _CategoryCard(
         category: categories[i],
         index: i,
+        openLabel: s.open,
+        lang: lang,
       ),
     );
   }
@@ -266,7 +298,10 @@ class _CategoryGrid extends StatelessWidget {
 class _CategoryCard extends StatefulWidget {
   final ConverterCategory category;
   final int index;
-  const _CategoryCard({required this.category, required this.index});
+  final String openLabel;
+  final String lang;
+  const _CategoryCard(
+      {required this.category, required this.index, required this.openLabel, required this.lang});
 
   @override
   State<_CategoryCard> createState() => _CategoryCardState();
@@ -315,7 +350,6 @@ class _CategoryCardState extends State<_CategoryCard>
           clipBehavior: Clip.hardEdge,
           child: Stack(
             children: [
-              // Gradient glow blob
               Positioned(
                 top: -20,
                 right: -20,
@@ -331,13 +365,11 @@ class _CategoryCardState extends State<_CategoryCard>
                   ),
                 ),
               ),
-              // Content
               Padding(
                 padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Icon box
                     Container(
                       width: 44,
                       height: 44,
@@ -360,14 +392,13 @@ class _CategoryCardState extends State<_CategoryCard>
                           color: Colors.white, size: 21),
                     ),
                     const SizedBox(width: 12),
-                    // Labels
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            widget.category.label,
+                            widget.category.localizedLabel(widget.lang),
                             style: const TextStyle(
                               color: AppColors.textPrimary,
                               fontSize: 13,
@@ -384,9 +415,9 @@ class _CategoryCardState extends State<_CategoryCard>
                               ShaderMask(
                                 shaderCallback: (b) =>
                                     LinearGradient(colors: g).createShader(b),
-                                child: const Text(
-                                  'Open',
-                                  style: TextStyle(
+                                child: Text(
+                                  widget.openLabel,
+                                  style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,

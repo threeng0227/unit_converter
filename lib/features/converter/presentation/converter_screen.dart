@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:unit_converter_pro/core/constants/converter_categories.dart';
+import 'package:unit_converter_pro/core/l10n/locale_provider.dart';
+import 'package:unit_converter_pro/core/services/conversion_engine.dart';
 import 'package:unit_converter_pro/core/theme/app_theme.dart';
 import 'package:unit_converter_pro/core/utils/number_formatter.dart';
 import 'package:unit_converter_pro/data/providers/repository_providers.dart';
@@ -99,13 +101,14 @@ class _ConverterScreenState extends ConsumerState<ConverterScreen> {
 }
 
 // ── Custom AppBar ─────────────────────────────────────────────────────────────
-class _AppBar extends StatelessWidget {
+class _AppBar extends ConsumerWidget {
   final ConverterCategory category;
   final List<Color> gradient;
   const _AppBar({required this.category, required this.gradient});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lang = ref.watch(localeProvider).languageCode;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Row(
@@ -144,7 +147,7 @@ class _AppBar extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Text(
-                  category.label,
+                  category.localizedLabel(lang),
                   style: const TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 17,
@@ -301,19 +304,20 @@ class _ResultPanel extends StatelessWidget {
 }
 
 // ── Copy button ───────────────────────────────────────────────────────────────
-class _CopyButton extends StatefulWidget {
+class _CopyButton extends ConsumerStatefulWidget {
   final String text;
   const _CopyButton({required this.text});
 
   @override
-  State<_CopyButton> createState() => _CopyButtonState();
+  ConsumerState<_CopyButton> createState() => _CopyButtonState();
 }
 
-class _CopyButtonState extends State<_CopyButton> {
+class _CopyButtonState extends ConsumerState<_CopyButton> {
   bool _copied = false;
 
   @override
   Widget build(BuildContext context) {
+    final s = stringsOf(ref);
     return GestureDetector(
       onTap: () async {
         HapticFeedback.lightImpact();
@@ -347,7 +351,7 @@ class _CopyButtonState extends State<_CopyButton> {
             ),
             const SizedBox(width: 5),
             Text(
-              _copied ? 'Copied' : 'Copy',
+              _copied ? s.copied : s.copy,
               style: TextStyle(
                 color: _copied ? Colors.green : AppColors.textSecondary,
                 fontSize: 12,
@@ -362,7 +366,7 @@ class _CopyButtonState extends State<_CopyButton> {
 }
 
 // ── Unit row ──────────────────────────────────────────────────────────────────
-class _UnitRow extends StatelessWidget {
+class _UnitRow extends ConsumerWidget {
   final ConverterState state;
   final List<Color> gradient;
   final ValueChanged<String> onFromChanged;
@@ -378,12 +382,15 @@ class _UnitRow extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final locale = ref.watch(localeProvider).languageCode;
+    final fromLabel = locale == 'vi' ? 'TỪ' : 'FROM';
+    final toLabel = locale == 'vi' ? 'SANG' : 'TO';
     return Row(
       children: [
         Expanded(
           child: _UnitPicker(
-            label: 'FROM',
+            label: fromLabel,
             selected: state.fromUnit,
             units: state.units,
             onChanged: onFromChanged,
@@ -394,7 +401,7 @@ class _UnitRow extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: _UnitPicker(
-            label: 'TO',
+            label: toLabel,
             selected: state.toUnit,
             units: state.units,
             onChanged: onToChanged,
@@ -464,7 +471,7 @@ class _SwapButtonState extends State<_SwapButton>
 }
 
 // ── Unit picker ───────────────────────────────────────────────────────────────
-class _UnitPicker extends StatelessWidget {
+class _UnitPicker extends ConsumerWidget {
   final String label;
   final String selected;
   final List<String> units;
@@ -478,9 +485,11 @@ class _UnitPicker extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final safe =
         units.contains(selected) ? selected : (units.firstOrNull ?? '—');
+    final lang = ref.watch(localeProvider).languageCode;
+    final displaySafe = ConversionEngine.localizedName(safe, lang);
 
     return GestureDetector(
       onTap: () {
@@ -513,7 +522,7 @@ class _UnitPicker extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    safe,
+                    displaySafe,
                     style: const TextStyle(
                       color: AppColors.textPrimary,
                       fontSize: 13,
@@ -555,7 +564,7 @@ class _UnitPicker extends StatelessWidget {
 }
 
 // ── Picker bottom sheet ───────────────────────────────────────────────────────
-class _PickerSheet extends StatefulWidget {
+class _PickerSheet extends ConsumerStatefulWidget {
   final String label;
   final String selected;
   final List<String> units;
@@ -569,10 +578,10 @@ class _PickerSheet extends StatefulWidget {
   });
 
   @override
-  State<_PickerSheet> createState() => _PickerSheetState();
+  ConsumerState<_PickerSheet> createState() => _PickerSheetState();
 }
 
-class _PickerSheetState extends State<_PickerSheet> {
+class _PickerSheetState extends ConsumerState<_PickerSheet> {
   late List<String> _filtered;
   final _ctrl = TextEditingController();
 
@@ -613,7 +622,7 @@ class _PickerSheetState extends State<_PickerSheet> {
             child: Row(
               children: [
                 Text(
-                  'Select ${widget.label} unit',
+                  '${stringsOf(ref).selectUnit} ${widget.label}',
                   style: const TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 17,
@@ -637,7 +646,7 @@ class _PickerSheetState extends State<_PickerSheet> {
               }),
               style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
               decoration: InputDecoration(
-                hintText: 'Search unit...',
+                hintText: stringsOf(ref).searchUnit,
                 hintStyle: const TextStyle(
                     color: AppColors.textSecondary, fontSize: 14),
                 prefixIcon: const Padding(
@@ -690,6 +699,9 @@ class _PickerSheetState extends State<_PickerSheet> {
               itemBuilder: (ctx, i) {
                 final unit = _filtered[i];
                 final sel = unit == widget.selected;
+                final symbol = ConversionEngine.symbolFor(unit);
+                final lang = ref.read(localeProvider).languageCode;
+                final displayName = ConversionEngine.localizedName(unit, lang);
                 return InkWell(
                   onTap: () => widget.onChanged(unit),
                   child: Padding(
@@ -698,16 +710,33 @@ class _PickerSheetState extends State<_PickerSheet> {
                     child: Row(
                       children: [
                         Expanded(
-                          child: Text(
-                            unit,
-                            style: TextStyle(
-                              color: sel
-                                  ? AppColors.primary
-                                  : AppColors.textPrimary,
-                              fontSize: 14,
-                              fontWeight: sel
-                                  ? FontWeight.w700
-                                  : FontWeight.w400,
+                          child: RichText(
+                            text: TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: displayName,
+                                  style: TextStyle(
+                                    color: sel
+                                        ? AppColors.primary
+                                        : AppColors.textPrimary,
+                                    fontSize: 14,
+                                    fontWeight: sel
+                                        ? FontWeight.w700
+                                        : FontWeight.w400,
+                                  ),
+                                ),
+                                if (symbol.isNotEmpty)
+                                  TextSpan(
+                                    text: symbol,
+                                    style: TextStyle(
+                                      color: sel
+                                          ? AppColors.primary.withValues(alpha: 0.7)
+                                          : AppColors.textSecondary,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         ),
@@ -750,8 +779,8 @@ class _CurrencyBadge extends ConsumerWidget {
           const SizedBox(width: 6),
           Text(
             ts != null
-                ? 'Live rates · ${ts.day}/${ts.month} ${ts.hour.toString().padLeft(2, '0')}:${ts.minute.toString().padLeft(2, '0')}'
-                : 'Live rates loaded',
+                ? '${stringsOf(ref).liveRates} · ${ts.day}/${ts.month} ${ts.hour.toString().padLeft(2, '0')}:${ts.minute.toString().padLeft(2, '0')}'
+                : stringsOf(ref).liveRates,
             style: const TextStyle(
                 color: AppColors.textSecondary, fontSize: 11),
           ),
@@ -765,8 +794,8 @@ class _CurrencyBadge extends ConsumerWidget {
               const BoxDecoration(color: Colors.orange, shape: BoxShape.circle),
         ),
         const SizedBox(width: 6),
-        const Text('Offline · cached rates',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+        Text(stringsOf(ref).offlineRates,
+            style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
       ]),
     );
   }
