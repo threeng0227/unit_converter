@@ -28,17 +28,24 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
     super.dispose();
   }
 
+  // Standard banner height — always reserved to avoid layout jumps
+  static const double _bannerHeight = 50.0;
+
   @override
   Widget build(BuildContext context) {
-    if (!_loaded || _ad == null) return const SizedBox.shrink();
     return SafeArea(
       top: false,
-      child: Center(
-        child: SizedBox(
-          height: _ad!.size.height.toDouble(),
-          width: _ad!.size.width.toDouble(),
-          child: AdWidget(ad: _ad!),
-        ),
+      child: SizedBox(
+        height: _bannerHeight,
+        child: _loaded && _ad != null
+            ? Center(
+                child: SizedBox(
+                  height: _ad!.size.height.toDouble(),
+                  width: _ad!.size.width.toDouble(),
+                  child: AdWidget(ad: _ad!),
+                ),
+              )
+            : const SizedBox.shrink(),
       ),
     );
   }

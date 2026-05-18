@@ -1,192 +1,201 @@
 """
-Generates clean launcher icon + splash logo for Unit Converter Pro.
-Design: dark navy bg · purple disc · two-arrow sync symbol (white)
+Unit Converter Pro — Premium Icon v3
+Design: Full indigo→purple gradient bg · Frosted disc · Bold ⇆ exchange arrows
+Renders at 2× then downscales with LANCZOS for maximum sharpness.
 """
 
 import math
 from PIL import Image, ImageDraw, ImageFilter
 
-BG           = (255, 255, 255)
-PURPLE_HI    = (120, 110, 255)
-PURPLE       = (108,  99, 255)
-PURPLE_LO    = ( 74,  63, 212)
+# ── Palette ───────────────────────────────────────────────────────────────────
+BG_TOP       = ( 45,  35, 140)   # deep indigo (top-left)
+BG_BOT       = ( 90,  55, 210)   # rich purple (bottom-right)
+DISC_COL     = (255, 255, 255)   # white frosted disc
+INDIGO_DARK  = ( 55,  48, 163)
+PURPLE       = ( 99,  88, 239)
+VIOLET       = (139,  92, 246)
 WHITE        = (255, 255, 255, 255)
+SHADOW_COL   = ( 80,  60, 200)
 
 
-# ── Geometry helpers ──────────────────────────────────────────────────────────
 def lerp(a, b, t):
     return a + (b - a) * t
 
-def pt_on_circle(cx, cy, r, deg):
-    rad = math.radians(deg)
-    return cx + r * math.cos(rad), cy + r * math.sin(rad)
-
-def draw_thick_arc(draw, cx, cy, r, start_deg, end_deg, color, thickness, steps=300):
-    """Draw a thick arc as a series of filled circles (smooth)."""
-    sweep = end_deg - start_deg
-    for i in range(steps + 1):
-        t   = i / steps
-        deg = start_deg + sweep * t
-        x, y = pt_on_circle(cx, cy, r, deg)
-        hw = thickness / 2
-        draw.ellipse([x - hw, y - hw, x + hw, y + hw], fill=color)
-
-def draw_arrowhead(draw, cx, cy, r, tip_deg, color, size):
-    """Draw a filled triangular arrowhead at tip_deg on circle r."""
-    tx, ty = pt_on_circle(cx, cy, r, tip_deg)
-    # tangent direction at tip
-    tang_deg = tip_deg + 90          # perpendicular = tangent of circle
-    tang_rad = math.radians(tang_deg)
-    # arrow points back along tangent
-    base_deg = tip_deg - 180
-    back_x = tx + size * 1.6 * math.cos(math.radians(base_deg))
-    back_y = ty + size * 1.6 * math.sin(math.radians(base_deg))
-    left_x  = back_x + size * math.cos(tang_rad)
-    left_y  = back_y + size * math.sin(tang_rad)
-    right_x = back_x - size * math.cos(tang_rad)
-    right_y = back_y - size * math.sin(tang_rad)
-    draw.polygon([(tx, ty), (left_x, left_y), (right_x, right_y)], fill=color)
-
-def draw_sync_icon(draw, cx, cy, R, stroke, color):
-    """
-    Two-arc sync/convert symbol:
-      Arc 1: top half  – starts at 200°, ends at 340°  (clockwise), arrowhead at 340°
-      Arc 2: bottom half – starts at 20°, ends at 160°  (clockwise), arrowhead at 160°
-    """
-    gap = 20   # degrees of gap between arcs
-    # Arc 1: upper arc (left→right at top)
-    s1, e1 = 200, 360 - gap
-    draw_thick_arc(draw, cx, cy, R, s1, e1, color, stroke)
-    draw_arrowhead(draw, cx, cy, R, e1, color, stroke * 0.9)
-
-    # Arc 2: lower arc (right→left at bottom)
-    s2, e2 = 20, 180 - gap
-    draw_thick_arc(draw, cx, cy, R, s2, e2, color, stroke)
-    draw_arrowhead(draw, cx, cy, R, e2, color, stroke * 0.9)
-
 
 def rounded_rect_mask(size, radius):
-    mask = Image.new("L", (size, size), 0)
-    ImageDraw.Draw(mask).rounded_rectangle(
-        [0, 0, size - 1, size - 1], radius=radius, fill=255
-    )
-    return mask
+    m = Image.new("L", (size, size), 0)
+    ImageDraw.Draw(m).rounded_rectangle([0, 0, size - 1, size - 1], radius=radius, fill=255)
+    return m
 
 
-def radial_gradient_disc(size, cx, cy, r, c_inner, c_outer):
-    """RGBA image with a smooth radial gradient disc."""
-    img  = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+def linear_gradient_bg(W, mask):
+    """Full-icon diagonal gradient: indigo top-left → purple bottom-right."""
+    img  = Image.new("RGBA", (W, W), (0, 0, 0, 0))
     data = img.load()
-    for y in range(size):
-        for x in range(size):
-            dx, dy = x - cx, y - cy
-            dist   = math.hypot(dx, dy)
-            if dist <= r:
-                t = dist / r
-                col = tuple(int(lerp(c_inner[i], c_outer[i], t)) for i in range(3)) + (255,)
-                data[x, y] = col
+    for y in range(W):
+        for x in range(W):
+            t = (x + y) / (2 * (W - 1))
+            col = tuple(int(lerp(BG_TOP[i], BG_BOT[i], t)) for i in range(3)) + (255,)
+            data[x, y] = col
+    # clip to rounded rect
+    out = Image.new("RGBA", (W, W), (0, 0, 0, 0))
+    out.paste(img, mask=mask)
+    return out
+
+
+def frosted_disc(W, cx, cy, r):
+    """White semi-transparent frosted-glass disc."""
+    img = Image.new("RGBA", (W, W), (0, 0, 0, 0))
+    d   = ImageDraw.Draw(img)
+    # outer disc — white @ 28% opacity
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(255, 255, 255, 72))
+    # inner disc — brighter centre
+    ri = int(r * 0.72)
+    d.ellipse([cx - ri, cy - ri, cx + ri, cy + ri], fill=(255, 255, 255, 38))
+    return img.filter(ImageFilter.GaussianBlur(W * 0.004))   # slight soften edge
+
+
+def disc_glow(W, cx, cy, r):
+    """Soft white glow around the frosted disc."""
+    img = Image.new("RGBA", (W, W), (0, 0, 0, 0))
+    d   = ImageDraw.Draw(img)
+    for i in range(25):
+        alpha = int(30 * (1 - i / 25) ** 2)
+        ri    = r + int(W * 0.007) * (25 - i)
+        d.ellipse([cx - ri, cy - ri, cx + ri, cy + ri],
+                  fill=(200, 190, 255, alpha))
+    return img.filter(ImageFilter.GaussianBlur(W * 0.012))
+
+
+def draw_exchange_arrows(W, cx, cy, disc_r):
+    """
+    Two bold horizontal arrows: top → right, bottom ← left.
+    Drawn on a transparent RGBA canvas.
+    """
+    img = Image.new("RGBA", (W, W), (0, 0, 0, 0))
+    d   = ImageDraw.Draw(img)
+
+    span   = int(disc_r * 1.02)   # total arrow span (left tip to right tip)
+    stem_h = int(W * 0.046)       # stem thickness
+    head_w = int(W * 0.060)       # arrowhead depth
+    head_h = int(W * 0.088)       # arrowhead half-height
+    gap    = int(W * 0.095)       # vertical gap from centre to each arrow
+
+    for direction, sign in [('right', -1), ('left', 1)]:
+        y     = cy + sign * gap
+        x_l   = cx - span // 2
+        x_r   = cx + span // 2
+
+        if direction == 'right':
+            # stem
+            d.rectangle([x_l, y - stem_h // 2, x_r - head_w, y + stem_h // 2], fill=WHITE)
+            # arrowhead →
+            d.polygon([
+                (x_r,          y),
+                (x_r - head_w, y - head_h // 2),
+                (x_r - head_w, y + head_h // 2),
+            ], fill=WHITE)
+        else:
+            # stem
+            d.rectangle([x_l + head_w, y - stem_h // 2, x_r, y + stem_h // 2], fill=WHITE)
+            # arrowhead ←
+            d.polygon([
+                (x_l,          y),
+                (x_l + head_w, y - head_h // 2),
+                (x_l + head_w, y + head_h // 2),
+            ], fill=WHITE)
+
     return img
 
 
+def inner_highlight(W, cx, cy, r):
+    """Specular highlight: bright spot top-left of disc."""
+    img = Image.new("RGBA", (W, W), (0, 0, 0, 0))
+    d   = ImageDraw.Draw(img)
+    hr  = int(r * 0.38)
+    ox  = int(W * 0.06)
+    oy  = int(W * 0.07)
+    d.ellipse([cx - hr - ox, cy - hr - oy, cx + hr - ox, cy + hr - oy],
+              fill=(255, 255, 255, 55))
+    return img.filter(ImageFilter.GaussianBlur(W * 0.045))
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
-#  LAUNCHER ICON  1024×1024
-# ═══════════════════════════════════════════════════════════════════════════════
-def make_launcher_icon(S=1024):
-    img  = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    mask = rounded_rect_mask(S, radius=int(S * 0.22))
-
-    # ── Background ────────────────────────────────────────────────────────────
-    bg = Image.new("RGBA", (S, S), BG + (255,))
-    img.paste(bg, mask=mask)
-
-    # ── Purple glow blob (top-left) ───────────────────────────────────────────
-    glow = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    gd   = ImageDraw.Draw(glow)
-    br   = int(S * 0.45)
-    gd.ellipse([-br // 3, -br // 3, br, br], fill=PURPLE + (20,))
-    glow = glow.filter(ImageFilter.GaussianBlur(S * 0.15))
-    composite = Image.alpha_composite(img, glow)
-    # Re-clip to rounded rect
-    clipped = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    clipped.paste(composite, mask=mask)
-    img = clipped
-
+def _make_icon_hires(S):
+    """Render at size S (work image, caller will downscale)."""
     cx, cy = S // 2, S // 2
+    mask   = rounded_rect_mask(S, radius=int(S * 0.22))
+    disc_r = int(S * 0.310)
 
-    # ── Outer decorative ring ─────────────────────────────────────────────────
-    ring_r = int(S * 0.36)
-    ring_w = max(2, int(S * 0.012))
-    ring   = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    rd     = ImageDraw.Draw(ring)
-    rd.ellipse(
-        [cx - ring_r, cy - ring_r, cx + ring_r, cy + ring_r],
-        outline=PURPLE_HI + (55,), width=ring_w,
-    )
-    img = Image.alpha_composite(img, ring)
+    # 1. Gradient background (full icon)
+    img = linear_gradient_bg(S, mask)
 
-    # ── Main purple disc (radial gradient) ────────────────────────────────────
-    disc_r = int(S * 0.295)
-    disc   = radial_gradient_disc(S, cx, cy, disc_r, PURPLE_HI, PURPLE_LO)
-    img    = Image.alpha_composite(img, disc)
+    # 2. Glow around disc
+    img = Image.alpha_composite(img, disc_glow(S, cx, cy, disc_r))
 
-    # ── Sync arrows ───────────────────────────────────────────────────────────
-    arrows   = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    ad       = ImageDraw.Draw(arrows)
-    arrow_r  = int(disc_r * 0.60)
-    stroke   = max(4, int(S * 0.030))
-    draw_sync_icon(ad, cx, cy, arrow_r, stroke, WHITE)
-    img = Image.alpha_composite(img, arrows)
+    # 3. Frosted glass disc
+    img = Image.alpha_composite(img, frosted_disc(S, cx, cy, disc_r))
 
-    # Final clip
+    # 4. Specular highlight
+    img = Image.alpha_composite(img, inner_highlight(S, cx, cy, disc_r))
+
+    # 5. Exchange arrows (white, solid)
+    img = Image.alpha_composite(img, draw_exchange_arrows(S, cx, cy, disc_r))
+
+    # 6. Re-clip to rounded rect
     out = Image.new("RGBA", (S, S), (0, 0, 0, 0))
     out.paste(img, mask=mask)
     return out
 
 
+def make_launcher_icon(final=1024):
+    raw = _make_icon_hires(final * 2)
+    return raw.resize((final, final), Image.LANCZOS)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
-#  ADAPTIVE FOREGROUND  1024×1024  (transparent bg)
-# ═══════════════════════════════════════════════════════════════════════════════
-def make_adaptive_fg(S=1024):
-    img  = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+def make_adaptive_fg(final=1024):
+    """Transparent adaptive-icon foreground (disc + arrows, no bg)."""
+    S  = final * 2
     cx, cy = S // 2, S // 2
-    disc_r = int(S * 0.295)
+    disc_r = int(S * 0.310)
 
-    disc = radial_gradient_disc(S, cx, cy, disc_r, PURPLE_HI, PURPLE_LO)
-    img  = Image.alpha_composite(img, disc)
+    img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    img = Image.alpha_composite(img, disc_glow(S, cx, cy, disc_r))
+    img = Image.alpha_composite(img, frosted_disc(S, cx, cy, disc_r))
+    img = Image.alpha_composite(img, inner_highlight(S, cx, cy, disc_r))
+    img = Image.alpha_composite(img, draw_exchange_arrows(S, cx, cy, disc_r))
 
-    arrows  = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    ad      = ImageDraw.Draw(arrows)
-    arrow_r = int(disc_r * 0.60)
-    stroke  = max(4, int(S * 0.030))
-    draw_sync_icon(ad, cx, cy, arrow_r, stroke, WHITE)
-    return Image.alpha_composite(img, arrows)
+    return img.resize((final, final), Image.LANCZOS)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  SPLASH LOGO  512×512  (transparent, used centred on splash bg)
-# ═══════════════════════════════════════════════════════════════════════════════
-def make_splash_logo(S=512):
-    img  = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+def make_splash_logo(final=1024):
+    """
+    Large transparent logo for native splash (dark bg).
+    Bigger disc, stronger glow — looks crisp at any density.
+    """
+    S  = final * 2
     cx, cy = S // 2, S // 2
-    disc_r  = int(S * 0.36)
+    disc_r = int(S * 0.340)
 
-    # Soft glow
+    img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+
+    # Wider, softer glow for splash
     glow = Image.new("RGBA", (S, S), (0, 0, 0, 0))
     gd   = ImageDraw.Draw(glow)
-    gr   = disc_r + int(S * 0.12)
-    gd.ellipse([cx - gr, cy - gr, cx + gr, cy + gr], fill=PURPLE + (60,))
-    glow = glow.filter(ImageFilter.GaussianBlur(S * 0.12))
-    img  = Image.alpha_composite(img, glow)
+    for i in range(50):
+        alpha = int(70 * (1 - i / 50) ** 1.5)
+        ri    = disc_r + int(S * 0.007) * (50 - i)
+        gd.ellipse([cx - ri, cy - ri, cx + ri, cy + ri],
+                   fill=PURPLE + (alpha,))
+    img = Image.alpha_composite(img, glow.filter(ImageFilter.GaussianBlur(S * 0.022)))
 
-    disc = radial_gradient_disc(S, cx, cy, disc_r, PURPLE_HI, PURPLE_LO)
-    img  = Image.alpha_composite(img, disc)
+    img = Image.alpha_composite(img, frosted_disc(S, cx, cy, disc_r))
+    img = Image.alpha_composite(img, inner_highlight(S, cx, cy, disc_r))
+    img = Image.alpha_composite(img, draw_exchange_arrows(S, cx, cy, disc_r))
 
-    arrows  = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    ad      = ImageDraw.Draw(arrows)
-    arrow_r = int(disc_r * 0.60)
-    stroke  = max(3, int(S * 0.038))
-    draw_sync_icon(ad, cx, cy, arrow_r, stroke, WHITE)
-    return Image.alpha_composite(img, arrows)
+    return img.resize((final, final), Image.LANCZOS)
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -195,12 +204,12 @@ if __name__ == "__main__":
 
     icon = make_launcher_icon(1024)
     icon.save(f"{base}/assets/icon/icon.png", "PNG")
-    print("✓ assets/icon/icon.png  (1024×1024)")
+    print("✓ icon.png  1024×1024")
 
     fg = make_adaptive_fg(1024)
     fg.save(f"{base}/assets/icon/icon_fg.png", "PNG")
-    print("✓ assets/icon/icon_fg.png  (adaptive foreground)")
+    print("✓ icon_fg.png  1024×1024")
 
-    splash = make_splash_logo(512)
+    splash = make_splash_logo(1024)
     splash.save(f"{base}/assets/splash/splash_logo.png", "PNG")
-    print("✓ assets/splash/splash_logo.png  (512×512)")
+    print("✓ splash_logo.png  1024×1024")
